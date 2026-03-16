@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Traffic Control Agent</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    /* DASHBOARD LAYOUT STYLES */
+    .app { width: 1050px !important; max-width: 95vw; }
+    .dashboard-container { display: flex; gap: 30px; margin-top: 20px; align-items: flex-start; }
+    .dashboard-left { width: 576px; height: 576px; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); position: relative; }
+    .dashboard-right { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+    .status, .log, .buttons { width: 100% !important; margin: 0 !important; }
+    .buttons { display: flex; flex-direction: column; gap: 12px; }
+    
+    .btn { border: none; border-radius: 12px; padding: 14px 18px; font-size: 16px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: opacity 0.2s; width: 100%; color: white;}
+    .btn:hover { opacity: 0.9; }
+    .btn-speed { background: #3b82f6; }
+    .btn-emergency { background: #ef4444; animation: pulse 2s infinite; }
+    
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+
+    /* YELLOW LIGHT CSS OVERRIDES */
+    .signal-vertical { height: auto !important; padding: 6px 4px !important; }
+    .signal-horizontal { width: auto !important; padding: 4px 6px !important; }
+    .light.yellow { background: #423812; }
+    .light.yellow.on { background: #f59e0b !important; box-shadow: 0 0 12px rgba(245, 158, 11, 0.9) !important; }
+
+    /* AMBULANCE STYLES */
+    .ambulance .car-body { background: white !important; border: 2px solid #ef4444; }
+    .ambulance-siren {
+      position: absolute; top: 35px; left: 10px; width: 18px; height: 6px; border-radius: 4px;
+      animation: sirenFlash 0.4s infinite alternate; z-index: 30;
+    }
+    @keyframes sirenFlash {
+      0% { background: red; box-shadow: 0 0 15px red; }
+      100% { background: blue; box-shadow: 0 0 15px blue; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    
+    <h1 class="title">Smart Traffic Control Agent</h1>
+
+    <div class="dashboard-container">
+      
+      <div class="dashboard-left">
+        <div class="scene" style="margin: 0 !important; transform: scale(0.8); transform-origin: top left;">
+          <img src="{{ url_for('static', filename='intersection.jpg') }}" alt="Intersection" class="map-image">
+
+          <div class="signal north-plate"><div class="signal-vertical"><span class="light red" id="northRed"></span><span class="light yellow" id="northYellow"></span><span class="light green" id="northGreen"></span></div></div>
+          <div class="signal south-plate"><div class="signal-vertical"><span class="light red" id="southRed"></span><span class="light yellow" id="southYellow"></span><span class="light green" id="southGreen"></span></div></div>
+          <div class="signal west-plate"><div class="signal-horizontal"><span class="light red" id="westRed"></span><span class="light yellow" id="westYellow"></span><span class="light green" id="westGreen"></span></div></div>
+          <div class="signal east-plate"><div class="signal-horizontal"><span class="light red" id="eastRed"></span><span class="light yellow" id="eastYellow"></span><span class="light green" id="eastGreen"></span></div></div>
+
+          <div class="camera cam-north">📷</div><div class="camera cam-south">📷</div><div class="camera cam-west">📷</div><div class="camera cam-east">📷</div>
+          <div class="sensor sensor-north"></div><div class="sensor sensor-south"></div><div class="sensor sensor-west"></div><div class="sensor sensor-east"></div>
+
+          <div id="carsLayer"></div>
+        </div>
+      </div>
+
+      <div class="dashboard-right">
+        
+        <div class="buttons" style="flex-direction: row; gap: 10px;">
+            <button id="speedBtn" class="btn btn-speed" onclick="toggleSpeed()">Speed: 1x</button>
+            <button id="emergencyBtn" class="btn btn-emergency" onclick="spawnAmbulance()">Spawn Ambulance 🚑</button>
+        </div>
+
+        <div class="status" id="statusBox"></div>
+
+        <div class="buttons" style="flex-direction: row; gap: 10px;">
+          <button class="btn next" id="autoBtn" onclick="toggleSimulation()">Start Live Traffic</button>
+          <button class="btn reset" onclick="resetSimulation()">Clear All</button>
+        </div>
+
+        <div class="log" id="logBox">System ready. Waiting to start...</div>
+
+        <div class="priority" id="priorityText" style="display: none;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      step: {{ data.step }},
+      active_lane: "{{ data.active_lane }}",
+      active_directions: "{{ data.active_directions }}",
+      phase: "{{ data.phase }}",
+      remaining_time: {{ data.remaining_time }},
+      switching: false
+    };
+
+    const carsLayer = document.getElementById("carsLayer");
+    const cars = { North: [], South: [], West: [], East: [] };
+    
+    const COLORS = ["yellow", "red", "green", "blue"];
+    const CAR_LENGTH = 76;
+    const SAFE_GAP = 94; 
+    const CAR_SPEED = 2.5; 
+
+    const LANES = {
+      North: { dir: "north", axis: "y", x: 303, spawn: -110, stop: 250, exit: 820 },
+      South: { dir: "south", axis: "y", x: 375, spawn: 760, stop: 460, exit: -140 },
+      West:  { dir: "west",  axis: "x", y: 280, spawn: -120, stop: 265, exit: 820 },
+      East:  { dir: "east",  axis: "x", y: 358, spawn: 760, stop: 480, exit: -140 }
+    };
+
+    let simInterval = null;
+    let spawnInterval = null;
+    let isAutoRunning = false;
+    let simMultiplier = 1;
+    let emergencyMode = false;
+
+    function getLaneState(lane) {
+      if (emergencyMode) {
+          return lane === "North" ? "GREEN" : "RED";
+      }
+      if (state.active_lane !== lane) return "RED";
+      return state.phase; 
+    }
+
+    function toggleSpeed() {
+      if (simMultiplier === 1) simMultiplier = 2;
+      else if (simMultiplier === 2) simMultiplier = 3;
+      else if (simMultiplier === 3) simMultiplier = 5;
+      else simMultiplier = 1;
+
+      document.getElementById("speedBtn").textContent = `Speed: ${simMultiplier}x`;
+      if (isAutoRunning) {
+        clearInterval(simInterval);
+        clearInterval(spawnInterval);
+        startTimers(); 
+      }
+    }
+
+    // --- EMERGENCY VEHICLE LOGIC ---
+    function spawnAmbulance() {
+      if(!isAutoRunning) return alert("Please start Live Traffic first!");
+      if(emergencyMode) return; 
+
+      document.getElementById("logBox").innerHTML = "<b style='color:red;'>🚨 EMERGENCY OVERRIDE ACTIVE 🚨</b>";
+      emergencyMode = true;
+      
+      // Force North Green instantly
+      state.active_lane = "North";
+      state.active_directions = "North";
+      state.phase = "GREEN";
+      state.remaining_time = "Hold";
+      updateUI();
+
+      // Create Ambulance
+      makeCar("North", "white", true);
+    }
+
+    function startTimers() {
+      simInterval = setInterval(() => {
+        if (emergencyMode) return; 
+
+        if (state.remaining_time > 0) {
+          state.remaining_time -= 1;
+          updateUI(); 
+        } else {
+          if (state.phase === "GREEN") {
+            state.phase = "YELLOW";
+            state.remaining_time = 3; 
+            updateUI();
+          } else {
+            fetchNextStepFromServer();
+          }
+        }
+      }, 1000 / simMultiplier); 
+
+      spawnInterval = setInterval(() => {
+        ["North", "South", "East", "West"].forEach(lane => {
+          const spawnChance = getLaneState(lane) === "GREEN" ? 0.40 : 0.15;
+          if (Math.random() < spawnChance && !emergencyMode) {
+            const laneCars = cars[lane];
+            let clearToSpawn = true;
+            
+            if (laneCars.length > 0) {
+                let lastCar = laneCars.reduce((prev, curr) => 
+                  (lane === "North" || lane === "West") 
+                    ? (prev[LANES[lane].axis] < curr[LANES[lane].axis] ? prev : curr) 
+                    : (prev[LANES[lane].axis] > curr[LANES[lane].axis] ? prev : curr)
+                );
+                if (Math.abs(lastCar[LANES[lane].axis] - LANES[lane].spawn) < SAFE_GAP + 25) clearToSpawn = false; 
+            }
+            if (clearToSpawn) makeCar(lane, COLORS[Math.floor(Math.random() * COLORS.length)]);
+          }
+        });
+      }, 800 / simMultiplier);
+    }
+
+    function toggleSimulation() {
+      const btn = document.getElementById("autoBtn");
+      if (isAutoRunning) {
+        clearInterval(simInterval);
+        clearInterval(spawnInterval);
+        isAutoRunning = false;
+        btn.textContent = "Resume Live Traffic";
+        btn.style.background = "#22c55e"; 
+        document.getElementById("logBox").innerHTML = "Traffic Paused.";
+      } else {
+        isAutoRunning = true;
+        btn.textContent = "Pause Traffic";
+        btn.style.background = "#ef4444"; 
+        document.getElementById("logBox").innerHTML = `Traffic Flowing. <b>${state.active_directions}</b> has the green light.`;
+        startTimers();
+      }
+    }
+
+    function createCarElement(direction, color, isAmbulance) {
+      const el = document.createElement("div");
+      el.className = `car ${direction} ${color} ${isAmbulance ? 'ambulance' : ''}`;
+      
+      let extras = isAmbulance ? `<div class="ambulance-siren"></div>` : '';
+      
+      el.innerHTML = `
+        <div class="car-body">
+          ${extras}
+          <div class="car-roof"></div>
+          <div class="glass front"></div>
+          <div class="glass rear"></div>
+          <div class="line"></div>
+          <div class="light-front left"></div>
+          <div class="light-front right"></div>
+          <div class="light-back left"></div>
+          <div class="light-back right"></div>
+          <div class="mirror left"></div>
+          <div class="mirror right"></div>
+          <div class="bumper front"></div>
+          <div class="bumper rear"></div>
+        </div>
+      `;
+      carsLayer.appendChild(el);
+      return el;
+    }
+
+    function makeCar(lane, color, isAmbulance = false) {
+      const cfg = LANES[lane];
+      const car = {
+        id: `${lane}-${Date.now()}-${Math.random()}`,
+        lane,
+        el: createCarElement(cfg.dir, color, isAmbulance),
+        speed: isAmbulance ? CAR_SPEED * 2.5 : CAR_SPEED, 
+        isAmbulance: isAmbulance,
+        x: 0,
+        y: 0
+      };
+
+      if (lane === "North" || lane === "South") { car.x = cfg.x; car.y = cfg.spawn; } 
+      else { car.x = cfg.spawn; car.y = cfg.y; }
+
+      updateCarPosition(car);
+      cars[lane].push(car);
+    }
+
+    function updateCarPosition(car) {
+      car.el.style.left = `${car.x}px`;
+      car.el.style.top = `${car.y}px`;
+    }
+    
+    function moveNorthLane() {
+      const laneCars = cars.North;
+      laneCars.sort((a, b) => b.y - a.y); 
+      const laneState = getLaneState("North");
+      const stopY = LANES.North.stop - CAR_LENGTH;
+
+      laneCars.forEach((car, index) => {
+        const hasPassedLine = car.y > stopY;
+        const distanceToStop = stopY - car.y;
+        const isTooCloseToStop = distanceToStop > 0 && distanceToStop < 80; 
+
+        let shouldStop = false;
+        if (laneState === "RED" && !hasPassedLine) shouldStop = true;
+        if (laneState === "YELLOW" && !hasPassedLine && !isTooCloseToStop) shouldStop = true;
+
+        let nextY = car.y + (car.speed * simMultiplier);
+        if (shouldStop) nextY = Math.min(nextY, stopY);
+        if (index > 0) nextY = Math.min(nextY, laneCars[index - 1].y - SAFE_GAP);
+        
+        car.y = Math.max(car.y, nextY); 
+        updateCarPosition(car);
+      });
+    }
+
+    function moveSouthLane() {
+      const laneCars = cars.South;
+      laneCars.sort((a, b) => a.y - b.y); 
+      const laneState = getLaneState("South");
+      const stopY = LANES.South.stop; 
+
+      laneCars.forEach((car, index) => {
+        const hasPassedLine = car.y < stopY; 
+        const isTooCloseToStop = (car.y - stopY) > 0 && (car.y - stopY) < 80;
+
+        let shouldStop = false;
+        if (laneState === "RED" && !hasPassedLine) shouldStop = true;
+        if (laneState === "YELLOW" && !hasPassedLine && !isTooCloseToStop) shouldStop = true;
+
+        let nextY = car.y - (car.speed * simMultiplier);
+        if (shouldStop) nextY = Math.max(nextY, stopY);
+        if (index > 0) nextY = Math.max(nextY, laneCars[index - 1].y + SAFE_GAP);
+        
+        car.y = Math.min(car.y, nextY); 
+        updateCarPosition(car);
+      });
+    }
+
+    function moveWestLane() {
+      const laneCars = cars.West;
+      laneCars.sort((a, b) => b.x - a.x); 
+      const laneState = getLaneState("West");
+      const stopX = LANES.West.stop - CAR_LENGTH;
+
+      laneCars.forEach((car, index) => {
+        const hasPassedLine = car.x > stopX; 
+        const isTooCloseToStop = (stopX - car.x) > 0 && (stopX - car.x) < 80;
+
+        let shouldStop = false;
+        if (laneState === "RED" && !hasPassedLine) shouldStop = true;
+        if (laneState === "YELLOW" && !hasPassedLine && !isTooCloseToStop) shouldStop = true;
+
+        let nextX = car.x + (car.speed * simMultiplier);
+        if (shouldStop) nextX = Math.min(nextX, stopX);
+        if (index > 0) nextX = Math.min(nextX, laneCars[index - 1].x - SAFE_GAP);
+        
+        car.x = Math.max(car.x, nextX); 
+        updateCarPosition(car);
+      });
+    }
+
+    function moveEastLane() {
+      const laneCars = cars.East;
+      laneCars.sort((a, b) => a.x - b.x); 
+      const laneState = getLaneState("East");
+      const stopX = LANES.East.stop;
+
+      laneCars.forEach((car, index) => {
+        const hasPassedLine = car.x < stopX; 
+        const isTooCloseToStop = (car.x - stopX) > 0 && (car.x - stopX) < 80;
+
+        let shouldStop = false;
+        if (laneState === "RED" && !hasPassedLine) shouldStop = true;
+        if (laneState === "YELLOW" && !hasPassedLine && !isTooCloseToStop) shouldStop = true;
+
+        let nextX = car.x - (car.speed * simMultiplier);
+        if (shouldStop) nextX = Math.max(nextX, stopX);
+        if (index > 0) nextX = Math.max(nextX, laneCars[index - 1].x + SAFE_GAP);
+
+        car.x = Math.min(car.x, nextX); 
+        updateCarPosition(car);
+      });
+    }
+
+    function recycleCars() {
+      ["North", "South", "East", "West"].forEach(lane => {
+        const laneCars = cars[lane];
+        for (let i = laneCars.length - 1; i >= 0; i--) {
+          const car = laneCars[i];
+          let out = false;
+
+          if (lane === "North" && car.y > LANES.North.exit) out = true;
+          if (lane === "South" && car.y < LANES.South.exit) out = true;
+          if (lane === "West" && car.x > LANES.West.exit) out = true;
+          if (lane === "East" && car.x < LANES.East.exit) out = true;
+
+          if (out) {
+            // If the ambulance exits, end the emergency mode!
+            if (car.isAmbulance) {
+                emergencyMode = false;
+                fetchNextStepFromServer(); 
+                document.getElementById("logBox").innerHTML = "Emergency Cleared. Resuming normal traffic.";
+            }
+            car.el.remove();
+            laneCars.splice(i, 1);
+          }
+        }
+      });
+    }
+
+    function animateCars() {
+      if (isAutoRunning) {
+        moveNorthLane();
+        moveSouthLane();
+        moveWestLane();
+        moveEastLane();
+        recycleCars();
+      }
+      requestAnimationFrame(animateCars);
+    }
+
+    function setLaneLights(lane, colorPhase) {
+      const red = document.getElementById(`${lane.toLowerCase()}Red`);
+      const yellow = document.getElementById(`${lane.toLowerCase()}Yellow`);
+      const green = document.getElementById(`${lane.toLowerCase()}Green`);
+
+      red.classList.remove("on"); yellow.classList.remove("on"); green.classList.remove("on");
+
+      if (colorPhase === "GREEN") green.classList.add("on");
+      else if (colorPhase === "YELLOW") yellow.classList.add("on");
+      else red.classList.add("on");
+    }
+
+    function updateSignals() {
+      ["North", "South", "East", "West"].forEach(lane => {
+        setLaneLights(lane, getLaneState(lane));
+      });
+    }
+
+    function updateStatus() {
+      const totalVisualCars = cars.North.length + cars.South.length + cars.East.length + cars.West.length;
+      document.getElementById("statusBox").innerHTML = `
+        <div class="status-grid">
+          <div><b>Active Direction:</b> <br/> ${emergencyMode ? "North Override" : state.active_directions}</div>
+          <div><b>Phase:</b> <br/> ${emergencyMode ? "<span style='color:red'>EMERGENCY</span>" : state.phase}</div>
+          <div><b>Time Remaining:</b> <br/> ${emergencyMode ? "Hold" : state.remaining_time + 's'}</div>
+          <div><b>Active Cars in Area:</b> <br/> ${totalVisualCars}</div>
+        </div>
+      `;
+    }
+
+    function updatePriority() {
+      document.getElementById("priorityText").textContent =
+        `Active: ${state.active_directions} | Phase: ${state.phase} | Green Time: ${state.remaining_time} sec`;
+    }
+
+    function updateUI() {
+      updatePriority();
+      updateSignals();
+      updateStatus();
+    }
+
+    function applyData(data) {
+      state.step = data.step;
+      state.active_lane = data.active_lane;
+      state.active_directions = data.active_directions; 
+      state.phase = data.phase; 
+      state.remaining_time = data.remaining_time;
+      updateUI();
+    }
+
+    async function fetchNextStepFromServer() {
+      if (state.switching || emergencyMode) return;
+      state.switching = true;
+
+      try {
+        const response = await fetch("/next_step");
+        const data = await response.json();
+        applyData(data);
+        document.getElementById("logBox").innerHTML = `Traffic update: <b>${state.active_directions}</b> now has the green light.`;
+      } finally {
+        state.switching = false;
+      }
+    }
+
+    async function resetSimulation() {
+      if (isAutoRunning) toggleSimulation(); 
+      
+      ["North", "South", "East", "West"].forEach(lane => { cars[lane].forEach(car => car.el.remove()); cars[lane].length = 0; });
+
+      simMultiplier = 1;
+      emergencyMode = false;
+      document.getElementById("speedBtn").textContent = "Speed: 1x";
+
+      const response = await fetch("/reset");
+      const data = await response.json();
+      applyData(data);
+      document.getElementById("logBox").textContent = "Intersection cleared. Click Start Live Traffic to begin.";
+    }
+
+    updateUI();
+    requestAnimationFrame(animateCars);
+  </script>
+</body>
+</html>
