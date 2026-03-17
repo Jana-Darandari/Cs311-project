@@ -10,8 +10,10 @@ body {
   padding: 20px;
 }
 
+/* DASHBOARD LAYOUT */
 .app {
-  width: 900px;
+  width: 1050px !important;
+  max-width: 95vw;
   margin: 0 auto;
   background: #f2f2f2;
   border-radius: 24px;
@@ -27,12 +29,28 @@ body {
   font-weight: 800;
 }
 
-.priority {
-  text-align: center;
-  color: #1d4ed8;
-  font-weight: 800;
-  font-size: 20px;
-  margin-bottom: 14px;
+.dashboard-container { 
+  display: flex; 
+  gap: 30px; 
+  margin-top: 20px; 
+  align-items: flex-start; 
+}
+
+.dashboard-left { 
+  width: 576px; 
+  height: 576px; 
+  border-radius: 14px; 
+  overflow: hidden; 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+  position: relative; 
+  background: #ddd;
+}
+
+.dashboard-right { 
+  flex: 1; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 16px; 
 }
 
 .scene {
@@ -42,7 +60,6 @@ body {
   margin: 0 auto;
   overflow: hidden;
   border-radius: 14px;
-  background: #ddd;
 }
 
 .map-image {
@@ -59,10 +76,85 @@ body {
   pointer-events: none;
 }
 
-.signal {
-  position: absolute;
-  z-index: 40;
+/* BUTTONS & UI */
+.buttons { 
+  width: 100% !important; 
+  margin: 0 !important; 
+  display: flex; 
+  flex-direction: row; 
+  gap: 10px; 
 }
+
+.btn { 
+  border: none; 
+  border-radius: 12px; 
+  padding: 14px 18px; 
+  font-size: 16px; 
+  font-weight: 800; 
+  cursor: pointer; 
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+  transition: opacity 0.2s; 
+  width: 100%; 
+  color: white;
+}
+
+.btn:hover { opacity: 0.9; }
+
+.btn.next { background: #22c55e; }
+.btn.reset { background: #f59e0b; }
+.btn-speed { background: #3b82f6; }
+.btn-emergency { background: #ef4444; animation: pulse 2s infinite; }
+.btn-maintenance { background: #f59e0b; color: #111827; }
+.btn-open { background: #22c55e; color: white; }
+.btn-icecream { background: #f472b6; color: white; }
+
+@keyframes pulse { 
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } 
+}
+
+/* STATUS & LOG BOXES */
+.status {
+  width: 100% !important;
+  margin: 0 !important;
+  background: white;
+  border: 1px solid #cfd4dc;
+  border-radius: 14px;
+  padding: 16px 18px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.8;
+  color: #111827;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+}
+
+.log {
+  width: 100% !important;
+  margin: 0 !important;
+  background: #eff6ff;
+  border-left: 5px solid #2563eb;
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.priority {
+  text-align: center;
+  color: #1d4ed8;
+  font-weight: 800;
+  font-size: 20px;
+  margin-bottom: 14px;
+}
+
+/* TRAFFIC LIGHTS (SIGNALS) */
+.signal { position: absolute; z-index: 40; }
 
 .signal-vertical,
 .signal-horizontal {
@@ -76,41 +168,22 @@ body {
   gap: 8px;
 }
 
-.signal-vertical {
-  width: 30px;
-  height: 86px;
-  flex-direction: column;
-  padding: 6px 0;
-}
+.signal-vertical { width: 30px; height: auto !important; flex-direction: column; padding: 6px 4px !important; }
+.signal-horizontal { width: auto !important; height: 30px; flex-direction: row; padding: 4px 6px !important; }
 
-.signal-horizontal {
-  width: 86px;
-  height: 30px;
-  flex-direction: row;
-}
+.light { width: 15px; height: 15px; border-radius: 50%; background: #2d3748; }
+.light.red.on { background: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.9); }
+.light.yellow { background: #423812; }
+.light.yellow.on { background: #f59e0b !important; box-shadow: 0 0 12px rgba(245, 158, 11, 0.9) !important; }
+.light.green.on { background: #22c55e; box-shadow: 0 0 10px rgba(34, 197, 94, 0.9); }
 
-.light {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #2d3748;
-}
-
-.light.red.on {
-  background: #ef4444;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.9);
-}
-
-.light.green.on {
-  background: #22c55e;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
-}
-
+/* ORIGINAL PLACEMENTS: PLATES */
 .north-plate { left: 255px; top: 170px; }
 .south-plate { left: 430px; top: 465px; }
 .west-plate  { left: 170px; top: 255px; }
 .east-plate  { left: 470px; top: 433px; }
 
+/* ORIGINAL PLACEMENTS: CAMERAS */
 .camera {
   position: absolute;
   z-index: 45;
@@ -130,6 +203,7 @@ body {
 .cam-west  { left: 130px; top: 255px; }
 .cam-east  { left: 560px; top: 435px; }
 
+/* ORIGINAL PLACEMENTS: SENSORS */
 .sensor {
   position: absolute;
   z-index: 30;
@@ -138,12 +212,12 @@ body {
   border-radius: 4px;
   box-shadow: 0 0 5px rgba(255,255,255,0.35);
 }
-
 .sensor-north { left: 322px; top: 224px; width: 74px; height: 10px; }
 .sensor-south { left: 322px; top: 486px; width: 74px; height: 10px; }
 .sensor-west  { left: 224px; top: 322px; width: 10px; height: 74px; }
 .sensor-east  { left: 486px; top: 322px; width: 10px; height: 74px; }
 
+/* STANDARD CARS */
 .car {
   position: absolute;
   width: 42px;
@@ -165,174 +239,64 @@ body {
   border-radius: 14px;
   border: 2px solid rgba(20,20,20,.35);
   overflow: hidden;
-  box-shadow:
-    inset 0 3px 7px rgba(255,255,255,.20),
-    inset 0 -5px 7px rgba(0,0,0,.12);
+  box-shadow: inset 0 3px 7px rgba(255,255,255,.20), inset 0 -5px 7px rgba(0,0,0,.12);
 }
 
-.car.yellow .car-body {
-  background: linear-gradient(to bottom, #ffe95a, #ffd000);
-}
+.car.yellow .car-body { background: linear-gradient(to bottom, #ffe95a, #ffd000); }
+.car.red .car-body { background: linear-gradient(to bottom, #ff6a60, #ff3a2f); }
+.car.green .car-body { background: linear-gradient(to bottom, #8af16f, #57d33c); }
+.car.blue .car-body { background: linear-gradient(to bottom, #64c2ff, #2c95e7); }
 
-.car.red .car-body {
-  background: linear-gradient(to bottom, #ff6a60, #ff3a2f);
-}
+.car-roof { position: absolute; left: 10px; top: 8px; width: 22px; height: 58px; border-radius: 10px; background: rgba(255,255,255,.09); }
+.glass { position: absolute; left: 7px; width: 28px; height: 13px; background: linear-gradient(to bottom, #708090, #475664); border: 2px solid rgba(255,255,255,.6); }
+.glass.front { top: 10px; border-radius: 10px 10px 5px 5px; }
+.glass.rear { bottom: 10px; border-radius: 5px 5px 10px 10px; }
+.line { position: absolute; left: 19px; top: 5px; width: 4px; height: 66px; border-radius: 2px; background: rgba(255,255,255,.72); }
 
-.car.green .car-body {
-  background: linear-gradient(to bottom, #8af16f, #57d33c);
-}
+.light-front, .light-back { position: absolute; width: 8px; height: 10px; border-radius: 50%; }
+.light-front { top: 4px; background: #fff2b3; }
+.light-back { bottom: 4px; background: #ff5c54; }
+.light-front.left, .light-back.left, .mirror.left { left: 3px; }
+.light-front.right, .light-back.right, .mirror.right { right: 3px; }
 
-.car.blue .car-body {
-  background: linear-gradient(to bottom, #64c2ff, #2c95e7);
-}
+.mirror { position: absolute; top: 30px; width: 5px; height: 12px; background: #6a6a6a; border-radius: 3px; }
+.bumper { position: absolute; left: 11px; width: 18px; height: 5px; border-radius: 6px; background: rgba(35,35,35,.4); }
+.bumper.front { top: 3px; }
+.bumper.rear { bottom: 3px; }
 
-.car-roof {
-  position: absolute;
-  left: 10px;
-  top: 8px;
-  width: 22px;
-  height: 58px;
-  border-radius: 10px;
-  background: rgba(255,255,255,.09);
-}
+/* SPECIAL VEHICLES: AMBULANCE */
+.ambulance .car-body { background: white !important; border: 2px solid #ef4444 !important; }
+.ambulance-siren { position: absolute; top: 35px; left: 10px; width: 18px; height: 6px; border-radius: 4px; animation: sirenFlash 0.4s infinite alternate; z-index: 30; }
+@keyframes sirenFlash { 0% { background: red; box-shadow: 0 0 15px red; } 100% { background: blue; box-shadow: 0 0 15px blue; } }
 
-.glass {
-  position: absolute;
-  left: 7px;
-  width: 28px;
-  height: 13px;
-  background: linear-gradient(to bottom, #708090, #475664);
-  border: 2px solid rgba(255,255,255,.6);
-}
+/* SPECIAL VEHICLES: MAINTENANCE TRUCK */
+.truck .car-body { background: #eab308 !important; border: 2px solid #854d0e !important; border-radius: 4px !important; }
+.truck .glass.rear { background: #333; height: 35px; top: 30px; border-radius: 0; border: none; } 
+.beacon { position: absolute; top: 15px; left: 14px; width: 10px; height: 10px; background: #fff; border-radius: 50%; animation: beaconFlash 0.5s infinite alternate; z-index: 30; }
+@keyframes beaconFlash { 0% { box-shadow: 0 0 20px 8px #facc15; } 100% { box-shadow: 0 0 0px 0px #eab308; } }
 
-.glass.front {
-  top: 10px;
-  border-radius: 10px 10px 5px 5px;
-}
+/* SPECIAL VEHICLES: ICE CREAM TRUCK */
+.icecream .car-body { background: #fdf2f8 !important; border: 3px solid #f472b6 !important; }
+.icecream .glass.front { background: #bae6fd; }
+.music-beacon { position: absolute; top: 15px; left: 14px; width: 12px; height: 12px; background: #f472b6; border-radius: 50%; animation: musicFlash 0.6s infinite alternate; z-index: 30; }
+@keyframes musicFlash { 0% { box-shadow: 0 0 15px 5px #f472b6; transform: scale(1); } 100% { box-shadow: 0 0 5px 2px #ec4899; transform: scale(1.2); } }
 
-.glass.rear {
-  bottom: 10px;
-  border-radius: 5px 5px 10px 10px;
-}
+/* KIDS (PEDESTRIANS) */
+.kid { position: absolute; width: 20px; height: 30px; display: none; z-index: 45; transition: transform 0.1s; }
+.kid .head { width: 10px; height: 10px; border: 2px solid #000; border-radius: 50%; margin: 0 auto; background: #fff; position: relative; }
+.kid .body { width: 2px; height: 10px; background: #000; margin: 0 auto; position: relative; }
+.kid .arms { position: absolute; top: 2px; left: -5px; width: 12px; height: 2px; background: #000; }
+.kid .legs { display: flex; justify-content: center; gap: 2px; }
+.kid .leg { width: 2px; height: 8px; background: #000; }
 
-.line {
-  position: absolute;
-  left: 19px;
-  top: 5px;
-  width: 4px;
-  height: 66px;
-  border-radius: 2px;
-  background: rgba(255,255,255,.72);
+/* MAINTENANCE CAUTION TAPE */
+.caution-tape {
+  position: absolute; height: 12px;
+  background: repeating-linear-gradient(45deg, #fbbf24, #fbbf24 10px, #000 10px, #000 20px);
+  z-index: 50; box-shadow: 0 2px 5px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.5s; border-radius: 2px;
+  transform-origin: left top; pointer-events: none;
 }
-
-.light-front,
-.light-back {
-  position: absolute;
-  width: 8px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.light-front {
-  top: 4px;
-  background: #fff2b3;
-}
-
-.light-back {
-  bottom: 4px;
-  background: #ff5c54;
-}
-
-.light-front.left,
-.light-back.left,
-.mirror.left {
-  left: 3px;
-}
-
-.light-front.right,
-.light-back.right,
-.mirror.right {
-  right: 3px;
-}
-
-.mirror {
-  position: absolute;
-  top: 30px;
-  width: 5px;
-  height: 12px;
-  background: #6a6a6a;
-  border-radius: 3px;
-}
-
-.bumper {
-  position: absolute;
-  left: 11px;
-  width: 18px;
-  height: 5px;
-  border-radius: 6px;
-  background: rgba(35,35,35,.4);
-}
-
-.bumper.front {
-  top: 3px;
-}
-
-.bumper.rear {
-  bottom: 3px;
-}
-
-.status {
-  width: 720px;
-  margin: 16px auto 0;
-  background: white;
-  border: 1px solid #cfd4dc;
-  border-radius: 14px;
-  padding: 16px 18px;
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.8;
-  color: #111827;
-}
-
-.status-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 18px;
-  margin-bottom: 14px;
-}
-
-.status-section {
-  margin-top: 10px;
-}
-
-.buttons {
-  width: 720px;
-  margin: 14px auto 0;
-  display: flex;
-  justify-content: center;
-  gap: 14px;
-}
-
-.btn {
-  border: none;
-  border-radius: 12px;
-  padding: 12px 22px;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-  color: white;
-}
-
-.btn.next { background: #22c55e; }
-.btn.reset { background: #f59e0b; }
-
-.log {
-  width: 720px;
-  margin: 14px auto 0;
-  background: #eff6ff;
-  border-left: 5px solid #2563eb;
-  border-radius: 10px;
-  padding: 14px 16px;
-  color: #1e293b;
-  font-weight: 700;
-}
+.caution-tape.show { opacity: 1; }
+#tape1 { left: 480px; top: 340px; width: 85px; transform: rotate(90deg); }
+#tape2 { left: 480px; top: 340px; width: 180px; transform: rotate(0deg); }
+#tape3 { left: 480px; top: 425px; width: 180px; transform: rotate(0deg); }
