@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 import random
 
 app = Flask(__name__)
@@ -7,57 +7,41 @@ class TrafficEnvironment:
     def __init__(self):
         self.reset()
 
-    def _initial_counts(self):
-        return {
-            "North": random.randint(1, 5),
-            "South": random.randint(1, 5),
-            "East": random.randint(1, 5),
-            "West": random.randint(1, 5),
-        }
-
-    def _choose_next_lane(self):
-        max_count = max(self.counts.values())
-        top_lanes = [lane for lane, count in self.counts.items() if count == max_count]
-        return random.choice(top_lanes)
-
-    def _green_time(self, lane):
-        count = self.counts[lane]
-        # Keep green times realistic between 10 and 20 seconds
-        return min(20, max(10, count * 2))
-
     def reset(self):
         self.step = 1
         self.phase = "GREEN"
-        self.waiting_time = 0
-        self.counts = self._initial_counts()
-        self.active_lane = self._choose_next_lane()
-        self.remaining_time = self._green_time(self.active_lane)
+        self.active_lane = "North"
+        self.remaining_time = 10
+        self.counts = {"North": 0, "South": 0, "East": 0, "West": 0}
+        self.waits = {"North": 0, "South": 0, "East": 0, "West": 0}
 
-    def _update_waiting_time(self):
-        for lane, count in self.counts.items():
-            if lane != self.active_lane:
-                self.waiting_time += count
-
-    def _simulate_new_traffic(self):
-        new_counts = {}
-
-        for lane, count in self.counts.items():
-            if lane == self.active_lane:
-                # Cars passed through, maybe a new one trickles in
-                new_counts[lane] = random.randint(0, 1)
-            else:
-                # Cars pile up at the red lights
-                new_counts[lane] = count + random.randint(1, 4)
-
-        self.counts = new_counts
-
-    def next_step(self):
+    def next_step(self, counts, waits):
         self.step += 1
-        self._update_waiting_time()
-        self._simulate_new_traffic()
-        self.active_lane = self._choose_next_lane()
+        self.counts = counts
+        self.waits = waits
+        
+        # =========================================================
+        # REAL-TIME AI LOGIC: MAX-PRESSURE CONTROL
+        # =========================================================
+        # Find the lane with the highest accumulated wait time
+        max_wait = max(self.waits.values())
+        
+        if max_wait > 0:
+            # Pick the lane with the most suffering cars!
+            top_lanes = [lane for lane, wait in self.waits.items() if wait == max_wait]
+            self.active_lane = random.choice(top_lanes)
+        else:
+            # If no one is waiting, just pick a lane with cars
+            max_count = max(self.counts.values())
+            if max_count > 0:
+                top_lanes = [lane for lane, count in self.counts.items() if count == max_count]
+                self.active_lane = random.choice(top_lanes)
+
         self.phase = "GREEN"
-        self.remaining_time = self._green_time(self.active_lane)
+        
+        # Give them enough time to clear the cars that are there
+        target_count = self.counts[self.active_lane]
+        self.remaining_time = min(20, max(8, target_count * 2))
 
     def get_data(self):
         return {
@@ -65,10 +49,7 @@ class TrafficEnvironment:
             "active_lane": self.active_lane,
             "active_directions": self.active_lane,
             "phase": self.phase,
-            "remaining_time": self.remaining_time,
-            "waiting_time": self.waiting_time,
-            "camera_counts": self.counts,
-            "sensor_counts": self.counts,
+            "remaining_time": self.remaining_time
         }
 
 env = TrafficEnvironment()
@@ -79,7 +60,21 @@ def home():
 
 @app.route("/next_step")
 def next_step():
-    env.next_step()
+    # Read the real-time CV Tracking data sent from the browser!
+    waits = {
+        "North": request.args.get('nw', default=0, type=int),
+        "South": request.args.get('sw', default=0, type=int),
+        "East": request.args.get('ew', default=0, type=int),
+        "West": request.args.get('ww', default=0, type=int)
+    }
+    counts = {
+        "North": request.args.get('nc', default=0, type=int),
+        "South": request.args.get('sc', default=0, type=int),
+        "East": request.args.get('ec', default=0, type=int),
+        "West": request.args.get('wc', default=0, type=int)
+    }
+    
+    env.next_step(counts, waits)
     return jsonify(env.get_data())
 
 @app.route("/reset")
